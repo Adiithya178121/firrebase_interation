@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Form</title>
+    <style>
+        body {
+            font-family: Arial;
+            width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Submit Feedback</h1>
+    <form id="feedbackForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" required>
+        
+        <label for="message">Message:</label>
+        <textarea id="message" required></textarea>
+        
+        <button type="submit">Submit Feedback</button>
+    </form>
+    
+    <div id="messageBox" class="message" style="display: none;"></div>
+
+    <script>
+        document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const message = document.getElementById('message').value;
+            const messageBox = document.getElementById('messageBox');
+            
+            // Firebase URL (same as provided)
+            const dbUrl = 'https://basic-project-with-firebase-default-rtdb.asia-southeast1.firebasedatabase.app/feedback.json';
+            
+            // Create feedback object
+            const feedback = {
+                username: username,
+                message: message,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Send POST request
+            fetch(dbUrl, {
+                method: 'POST',
+                body: JSON.stringify(feedback),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to submit feedback');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Show success message
+                messageBox.textContent = 'Feedback submitted successfully!';
+                messageBox.className = 'message success';
+                messageBox.style.display = 'block';
+                
+                // Clear form
+                document.getElementById('feedbackForm').reset();
+            })
+            .catch(error => {
+                // Show error message
+                messageBox.textContent = 'Error: ' + error.message;
+                messageBox.className = 'message error';
+                messageBox.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
