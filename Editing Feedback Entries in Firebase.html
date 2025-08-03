@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback System</title>
+    <style>
+        body {
+            font-family: Arial;
+            width: 90%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-container {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            background: #f5f5f5;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+        textarea {
+            height: 100px;
+        }
+        button {
+            padding: 8px 15px;
+            margin-right: 10px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button.cancel {
+            background: #f4b400;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #f2f2f2;
+        }
+        .edit-btn {
+            background: #0f9d58;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #e6f4ea;
+            color: #0d652d;
+        }
+        .error {
+            background: #fce8e6;
+            color: #c5221f;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Feedback System</h1>
+    
+    <div class="form-container">
+        <h2 id="form-title">Submit Feedback</h2>
+        <form id="feedbackForm">
+            <input type="hidden" id="feedbackId">
+            <label for="username">Username:</label>
+            <input type="text" id="username" required>
+            
+            <label for="message">Message:</label>
+            <textarea id="message" required></textarea>
+            
+            <button type="submit" id="submitBtn">Submit</button>
+            <button type="button" id="cancelBtn" class="cancel hidden">Cancel</button>
+        </form>
+        <div id="messageBox" class="message"></div>
+    </div>
+    
+    <h2>Feedback List</h2>
+    <table id="feedbackTable">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Message</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="feedbackTableBody">
+            <!-- Feedback will be loaded here -->
+        </tbody>
+    </table>
+
+    <script>
+        const dbUrl = 'https://basic-project-with-firebase-default-rtdb.asia-southeast1.firebasedatabase.app/users.json';
+        
+        // DOM elements
+        const feedbackForm = document.getElementById('feedbackForm');
+        const usernameInput = document.getElementById('username');
+        const messageInput = document.getElementById('message');
+        const feedbackIdInput = document.getElementById('feedbackId');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const messageBox = document.getElementById('messageBox');
+        const feedbackTableBody = document.getElementById('feedbackTableBody');
+        const formTitle = document.getElementById('form-title');
+        
+        let isEditing = false;
+        let currentFeedbackId = null;
+        
+        // Load feedback when page loads
+        document.addEventListener('DOMContentLoaded', loadFeedback);
+        
+        // Form submission
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = usernameInput.value;
+            const message = messageInput.value;
+            
+            if (isEditing) {
+                updateFeedback(currentFeedbackId, username, message);
+            } else {
+                submitFeedback(username, message);
+            }
+        });
+        
+        // Cancel edit
+        cancelBtn.addEventListener('click', resetForm);
+        
+        function loadFeedback() {
+            fetch(dbUrl)
+                .then(response => response.json())
+                .then(data => {
+                    feedbackTableBody.innerHTML = '';
+                    
+                    if (!data) {
+                        showMessage('No feedback found.', 'error');
+                        return;
+                    }
+                    
+                    for (const [id, feedback] of Object.entries(data)) {
+                        addFeedbackToTable(id, feedback);
+                    }
+                })
+                .catch(error => {
+                    showMessage('Error loading feedback: ' + error.message, 'error');
+                });
+        }
+        
+        function addFeedbackToTable(id, feedback) {
+            const row = document.createElement('tr');
+            
+            const usernameCell = document.createElement('td');
+            usernameCell.textContent = feedback.username || 'Anonymous';
+            
+            const messageCell = document.createElement('td');
+            messageCell.textContent = feedback.message;
+            
+            const actionsCell = document.createElement('td');
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'edit-btn';
+            editBtn.addEventListener('click', () => editFeedback(id, feedback));
+            actionsCell.appendChild(editBtn);
+            
+            row.appendChild(usernameCell);
+            row.appendChild(messageCell);
+            row.appendChild(actionsCell);
+            
+            feedbackTableBody.appendChild(row);
+        }
+        
+        function submitFeedback(username, message) {
+            const feedback = {
+                username,
+                message,
+                timestamp: new Date().toISOString()
+            };
+            
+            fetch(dbUrl, {
+                method: 'POST',
+                body: JSON.stringify(feedback),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to submit feedback');
+                return response.json();
+            })
+            .then(data => {
+                showMessage('Feedback submitted successfully!', 'success');
+                feedbackForm.reset();
+                loadFeedback();
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            });
+        }
+        
+        function editFeedback(id, feedback) {
+            isEditing = true;
+            currentFeedbackId = id;
+            
+            formTitle.textContent = 'Edit Feedback';
+            submitBtn.textContent = 'Update';
+            cancelBtn.classList.remove('hidden');
+            
+            usernameInput.value = feedback.username || '';
+            messageInput.value = feedback.message || '';
+            feedbackIdInput.value = id;
+        }
+        
+        function updateFeedback(id, username, message) {
+            const feedback = {
+                username,
+                message
+            };
+            
+            fetch(`https://basic-project-with-firebase-default-rtdb.asia-southeast1.firebasedatabase.app/users/${id}.json`, {
+                method: 'PATCH',
+                body: JSON.stringify(feedback),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to update feedback');
+                return response.json();
+            })
+            .then(data => {
+                showMessage('Feedback updated successfully!', 'success');
+                resetForm();
+                loadFeedback();
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            });
+        }
+        
+        function resetForm() {
+            isEditing = false;
+            currentFeedbackId = null;
+            
+            formTitle.textContent = 'Submit Feedback';
+            submitBtn.textContent = 'Submit';
+            cancelBtn.classList.add('hidden');
+            
+            feedbackForm.reset();
+            feedbackIdInput.value = '';
+        }
+        
+        function showMessage(text, type) {
+            messageBox.textContent = text;
+            messageBox.className = `message ${type}`;
+            setTimeout(() => {
+                messageBox.textContent = '';
+                messageBox.className = 'message';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
